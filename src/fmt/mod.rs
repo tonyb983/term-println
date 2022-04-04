@@ -97,6 +97,8 @@ impl Formatter {
         // ' ' - Group Separator (Dec 29, Oct 035, Hex 1D)
         // ' ' - Record Separator (Dec 30, Oct 036, Hex 1E)
         // ' ' - Unit Separator (Dec 31, Oct 037, Hex 1F)
+        // "\u{1}" - Unknown, but length 1
+        // "\u{2}" - Unknown, but length 1
         const LEFT_PLACEHOLDER: &str = "\u{1}";
         const RIGHT_PLACEHOLDER: &str = "\u{2}";
 
@@ -235,5 +237,33 @@ mod tests {
         let output = f.generate(&args).unwrap();
         // println!("Output = {}", output);
         assert_eq!(output, "Thats way too many args bro.");
+    }
+
+    #[test]
+    fn chars() {
+        fn print_and_len<S: AsRef<str>>(input: S) {
+            let input = input.as_ref();
+            println!("Length of '{}' is {}", input, input.len());
+        }
+
+        let bl = "{";
+        let br = "}";
+        let bbl = "{{";
+        let bbr = "}}";
+        let uni = "\u{F0000}";
+        let uni2 = "\u{AE}";
+        let uni3 = "\u{0}";
+        let uni4 = "\u{1}";
+        let uni5 = "\u{2}";
+        print_and_len(bl);
+        print_and_len(bbl);
+        print_and_len(br);
+        print_and_len(bbr);
+        print_and_len(uni);
+        print_and_len(uni2);
+        print_and_len(uni3);
+        print_and_len(uni4);
+        print_and_len(uni5);
+        print_and_len("‰");
     }
 }

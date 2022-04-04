@@ -14,10 +14,11 @@ pub enum Error {
 }
 
 impl Error {
-    pub fn bad_arg_num(requested_num: usize, arg_count: usize) -> Self {
+    pub fn bad_arg_num(requested_index: usize, arg_count: usize) -> Self {
         Self::InvalidArgNumber(format!(
             "Arg number {} was requested, but only {} args were provided",
-            requested_num, arg_count
+            requested_index + 1,
+            arg_count
         ))
     }
 }
