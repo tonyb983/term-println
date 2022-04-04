@@ -71,6 +71,8 @@ impl Formatter {
                 s
             };
 
+            // TODO: Use the alignment and width here to modify `insert`
+
             mods.push((insert.clone(), spec.fmt_pos));
         }
 

@@ -151,6 +151,12 @@ impl FormatSpec {
             Err(crate::Error::InvalidSpec(spec_str.to_string()))
         }
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.arg_num.is_none()
+            && (self.align.is_none() || matches!(self.align, Some(Alignment::Left)))
+            && self.width.is_none()
+    }
 }
 
 #[cfg(test)]
@@ -164,6 +170,7 @@ mod tests {
         assert_eq!(spec.arg_num, None);
         assert_eq!(spec.align, None);
         assert_eq!(spec.width, None);
+        assert!(spec.is_empty());
     }
 
     #[test]

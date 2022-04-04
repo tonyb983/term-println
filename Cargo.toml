@@ -2,6 +2,7 @@
 authors = ["Tony B. <tonyb983@gmail.com>"]
 description = "Simple little utility to use rust-style format strings in the terminal"
 edition = "2021"
+# Package name changed for shorter convenient binary name. There's probably a better way to do this?
 name = "fmt"
 repository = "https://github.com/tonyb983/term-println"
 version = "0.1.0"
@@ -9,9 +10,6 @@ version = "0.1.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-rt-format = "0.3.0"
-# runtime-fmt = "0.4.1"
-dynfmt = "0.1.5"
 once_cell = "1.10.0"
 regex = "1.5.5"
 terminal_size = "0.1.17"
