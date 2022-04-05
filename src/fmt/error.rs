@@ -21,6 +21,10 @@ impl Error {
             arg_count
         ))
     }
+
+    pub fn bad_spec(spec: &str) -> Self {
+        Self::InvalidSpec(format!("Invalid format specifier: {}", spec))
+    }
 }
 
 impl std::fmt::Display for Error {

@@ -1,10 +1,11 @@
+#![feature(round_char_boundary)]
 #![allow(dead_code, unused)]
 
 mod fmt;
 
 use std::env;
 
-pub use fmt::{Error, Result};
+pub use fmt::*;
 
 fn main() -> Result<()> {
     let bin = env::args().next().expect("Unable to get env::args[0]");
@@ -31,6 +32,7 @@ fn format<S: std::fmt::Display>(bin: &str, all_args: &[S]) -> Result<()> {
     }
 
     let f = fmt::Formatter::new(&all_args[0].to_string())?;
+    println!("Formatter: {:#?}", f);
     let output = f.generate(&all_args[1..])?;
     println!("{}", output);
 

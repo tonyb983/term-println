@@ -59,6 +59,11 @@ pub fn spec_regex_simple() -> &'static Regex {
     })
 }
 
+pub fn spec_regex_brackets_only() -> &'static Regex {
+    static REGEX: OnceCell<Regex> = OnceCell::new();
+    REGEX.get_or_init(|| Regex::new(r"\{.*\}").expect("Failed to compile regex"))
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Alignment {
     Left,
@@ -71,6 +76,7 @@ pub struct FormatSpec {
     pub fmt_pos: usize,
     pub spec_num: usize,
     pub arg_num: Option<usize>,
+    pub arg_name: Option<String>,
     pub align: Option<Alignment>,
     pub width: Option<usize>,
 }
@@ -81,14 +87,19 @@ impl FormatSpec {
             return Ok(Self {
                 fmt_pos: fmt_start,
                 spec_num: spec_no,
+                arg_name: None,
                 arg_num: None,
                 align: None,
                 width: None,
             });
         }
 
-        if !spec_str.starts_with('{') && !spec_str.ends_with('}') {
-            return Err(crate::Error::InvalidSpec(spec_str.to_string()));
+        if spec_str.contains("{{") || spec_str.contains("}}") {
+            return Err(crate::Error::bad_spec(spec_str));
+        }
+
+        if !spec_str.starts_with('{') || !spec_str.ends_with('}') {
+            return Err(crate::Error::bad_spec(spec_str));
         }
 
         let inner = spec_str.trim_start_matches('{').trim_end_matches('}');
@@ -96,6 +107,7 @@ impl FormatSpec {
             Ok(Self {
                 fmt_pos: fmt_start,
                 spec_num: spec_no,
+                arg_name: None,
                 arg_num: None,
                 align: None,
                 width: None,
@@ -104,6 +116,7 @@ impl FormatSpec {
             Ok(Self {
                 fmt_pos: fmt_start,
                 spec_num: spec_no,
+                arg_name: None,
                 arg_num: Some(num),
                 align: None,
                 width: None,
@@ -111,12 +124,13 @@ impl FormatSpec {
         } else if let Some(colon) = inner.find(':') {
             let (left, rest) = inner.split_at(colon);
             let mut right = &rest[1..];
-            let arg_num = if left.is_empty() {
-                None
+            let (arg_name, arg_num) = if left.is_empty() {
+                (None, None)
             } else if let Ok(num) = left.parse::<usize>() {
-                Some(num)
+                (None, Some(num))
             } else {
-                return Err(crate::Error::InvalidSpec(spec_str.to_string()));
+                (Some(left.to_string()), None)
+                // return Err(crate::Error::InvalidSpec(spec_str.to_string()));
             };
 
             let align = if right.starts_with(['<', '>', '^']) {
@@ -137,18 +151,19 @@ impl FormatSpec {
             } else if let Ok(n) = right.parse::<usize>() {
                 Some(n)
             } else {
-                return Err(crate::Error::InvalidSpec(spec_str.to_string()));
+                return Err(crate::Error::bad_spec(spec_str));
             };
 
             Ok(Self {
                 fmt_pos: fmt_start,
                 spec_num: spec_no,
+                arg_name,
                 arg_num,
                 align,
                 width,
             })
         } else {
-            Err(crate::Error::InvalidSpec(spec_str.to_string()))
+            Err(crate::Error::bad_spec(spec_str))
         }
     }
 
