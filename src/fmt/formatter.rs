@@ -90,21 +90,34 @@ impl Formatter {
         let mut mods = Vec::new();
 
         for spec in &self.fmt_spec {
-            let insert = if let Some(n) = spec.arg_num {
-                match args.get(n) {
+            let insert = if let Some(num) = spec.arg_num {
+                match args.get(num) {
                     Some(s) => s,
-                    None => return Err(crate::Error::bad_arg_num(n, args.len())),
+                    None => {
+                        eprintln!("Unable to find numbered arg #{}", num);
+                        return Err(crate::Error::bad_arg_num(num, args.len()));
+                    }
+                }
+            } else if let Some(ref name) = spec.arg_name {
+                match args.get_named(name) {
+                    Some(s) => s,
+                    None => {
+                        eprintln!("Unable to find named arg '{}'", name);
+                        return Err(crate::Error::bad_arg_name(name));
+                    }
                 }
             } else {
                 let s = match args.get(positional_count) {
                     Some(s) => s,
-                    None => return Err(crate::Error::bad_arg_num(positional_count, args.len())),
+                    None => {
+                        eprintln!("Positional arg requests have surpassed provided args");
+                        return Err(crate::Error::bad_arg_num(positional_count, args.len()));
+                    }
                 };
                 positional_count += 1;
                 s
             };
 
-            // TODO: Use the alignment and width here to modify `insert`
             let width = match spec.width {
                 Some(w) => w,
                 None => UnicodeWidthStr::width(insert.as_str()),

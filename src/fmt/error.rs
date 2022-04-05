@@ -9,6 +9,7 @@ pub enum Error {
     InvalidFormat,
     InvalidSpec(String),
     InvalidArgNumber(String),
+    InvalidArgName(String),
     IncorrectNumberOfArgs,
     Other(String),
 }
@@ -19,6 +20,13 @@ impl Error {
             "Arg number {} was requested, but only {} args were provided",
             requested_index + 1,
             arg_count
+        ))
+    }
+
+    pub fn bad_arg_name(requested_name: &str) -> Self {
+        Self::InvalidArgNumber(format!(
+            "Arg name {} was requested, but could not be found",
+            requested_name
         ))
     }
 
@@ -35,6 +43,7 @@ impl std::fmt::Display for Error {
             Error::InvalidSpec(msg) => write!(f, "Invalid format specifier: {}", msg),
             Error::Other(s) => write!(f, "{}", s),
             Error::InvalidArgNumber(s) => write!(f, "Invalid argument number: {}", s),
+            Error::InvalidArgName(s) => write!(f, "Invalid argument name: {}", s),
         }
     }
 }

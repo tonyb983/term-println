@@ -7,61 +7,11 @@
 use once_cell::sync::OnceCell;
 use regex::Regex;
 
-pub fn spec_regex() -> &'static Regex {
+fn arg_name_regex() -> &'static Regex {
     static REGEX: OnceCell<Regex> = OnceCell::new();
     REGEX.get_or_init(|| {
-        Regex::new(
-            r"(?x)
-        \{
-            (?P<Inner>
-                (?P<ArgId>\d+|[a-zA-Z_]\w*)?
-                (?P<FmtSpec>:
-                    (?:
-                        (?P<Fill>[^{}])?
-                        (?P<Align>[<>\^])
-                    )?
-                    (?P<Sign>[+-s])?
-                    (?P<AltForm>\#)?
-                    (?P<NegPadding>[0])?
-                    (?P<Width>
-                        (?P<WidthNumber>\d+)|
-                        (?P<WidthArgId>\{
-                            (?P<WidthInner>
-                                (?P<WidthArgInteger>\d+)|
-                                (?P<WidthArgIdentifier>[a-zA-Z_]\w*)
-                            )?
-                        \})
-                    )? # Width Group
-                    (?:\.
-                        (?P<Precision>
-                            (?P<PrecisionNumber>\d+)|
-                            (?P<PrecisionArgId>\{
-                                (?P<PrecisionInner>
-                                    (?P<PrecisionArgInteger>\d+)|
-                                    (?P<PrecisionArgIdentifier>[a-zA-Z_]\w*)
-                                )?
-                            \})
-                        )
-                    )? # Precision Group
-                    (?P<Type>[bBdoxXaAceEfFgGLps])?
-                )*? # FmtSpec
-            )*? # Inner
-        \}",
-        )
-        .expect("Failed to compile spec regex")
+        Regex::new(r"[a-zA-Z]{1}[a-zA-Z0-9_]*").expect("Unable to compile arg name regex")
     })
-}
-
-pub fn spec_regex_simple() -> &'static Regex {
-    static REGEX: OnceCell<Regex> = OnceCell::new();
-    REGEX.get_or_init(|| {
-        Regex::new(r"\{(?P<Inner>(?P<ArgId>\d+|[a-zA-Z_]\w*)?)\}").expect("Failed to compile regex")
-    })
-}
-
-pub fn spec_regex_brackets_only() -> &'static Regex {
-    static REGEX: OnceCell<Regex> = OnceCell::new();
-    REGEX.get_or_init(|| Regex::new(r"\{.*\}").expect("Failed to compile regex"))
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -112,25 +62,18 @@ impl FormatSpec {
                 align: None,
                 width: None,
             })
-        } else if let Ok(num) = inner.parse::<usize>() {
-            Ok(Self {
-                fmt_pos: fmt_start,
-                spec_num: spec_no,
-                arg_name: None,
-                arg_num: Some(num),
-                align: None,
-                width: None,
-            })
-        } else if let Some(colon) = inner.find(':') {
-            let (left, rest) = inner.split_at(colon);
+        } else if let Some(colon_pos) = inner.find(':') {
+            let (left, rest) = inner.split_at(colon_pos);
             let mut right = &rest[1..];
             let (arg_name, arg_num) = if left.is_empty() {
                 (None, None)
             } else if let Ok(num) = left.parse::<usize>() {
                 (None, Some(num))
-            } else {
+            } else if arg_name_regex().is_match(left) {
                 (Some(left.to_string()), None)
-                // return Err(crate::Error::InvalidSpec(spec_str.to_string()));
+            } else {
+                eprintln!("Unable to parse left side of colon in spec: {}", spec_str);
+                return Err(crate::Error::InvalidSpec(spec_str.to_string()));
             };
 
             let align = if right.starts_with(['<', '>', '^']) {
@@ -143,6 +86,7 @@ impl FormatSpec {
                 right = &right[1..];
                 Some(a)
             } else {
+                // TODO: Should this be None? Should align be Alignment instead of Option<Alignment>?
                 Some(Alignment::Left)
             };
 
@@ -161,6 +105,24 @@ impl FormatSpec {
                 arg_num,
                 align,
                 width,
+            })
+        } else if let Ok(num) = inner.parse::<usize>() {
+            Ok(Self {
+                fmt_pos: fmt_start,
+                spec_num: spec_no,
+                arg_name: None,
+                arg_num: Some(num),
+                align: None,
+                width: None,
+            })
+        } else if arg_name_regex().is_match(spec_str) {
+            Ok(Self {
+                fmt_pos: fmt_start,
+                spec_num: spec_no,
+                arg_name: Some(inner.to_string()),
+                arg_num: None,
+                align: None,
+                width: None,
             })
         } else {
             Err(crate::Error::bad_spec(spec_str))
