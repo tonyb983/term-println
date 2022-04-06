@@ -330,15 +330,24 @@ mod tests {
     }
 
     #[test]
+    fn multi1() {
+        // cargo run -- "lets {test} some {} up {}. hell {:^8}" "fuck" "❤️🧡❤️" "FUCKING YES BRO AMIRITE" "test = bro"
+        const INPUT: &str = "lets {test} some {} up {}. hell {:^8}";
+        const ARGS: [&str; 4] = ["fuck", "❤️🧡❤️", "FUCKING YES BRO AMIRITE", "test = bro"];
+        let output = Formatter::format(INPUT, &ARGS).expect("multi1 - failed to format");
+        assert_eq!(output, "lets bro some fuck up ❤️🧡❤️. hell  YES BRO");
+    }
+
+    #[test]
     fn escaped() {
         const INPUT: &str = "Hi {}, these are brackets: {{}}";
         const INPUT2: &str = "These brackets {{}} are super cool right {}?";
-        let args = vec!["Tony"];
-        let ref_args = args.iter().map(|s| s.to_string()).collect::<Vec<_>>();
-        let output = Formatter::format(INPUT, &args).unwrap();
+        const ARGS: [&str; 1] = ["Tony"];
+        let ref_args = ARGS.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        let output = Formatter::format(INPUT, &ARGS).unwrap();
         // println!("Output = {}", output);
         assert_eq!(output, "Hi Tony, these are brackets: {}");
-        let output = Formatter::format(INPUT2, &args).unwrap();
+        let output = Formatter::format(INPUT2, &ARGS).unwrap();
         // println!("Output = {}", output);
         assert_eq!(output, "These brackets {} are super cool right Tony?");
     }
