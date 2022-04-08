@@ -1,4 +1,4 @@
-use ansirs::{style_text, Ansi, Colors};
+use ansirs::*;
 
 pub fn print_usage(bin: &str) -> crate::Result<()> {
     fn header(text: &str) {
@@ -68,25 +68,45 @@ pub fn print_usage_long(bin: &str) -> crate::Result<()> {
     }
     fn term(cmd: &str, args: &[&str], indent: bool, quote_args: bool) {
         if args.is_empty() {
-            println!("{1}$ {0}", cmd, if indent { "\t" } else { "" });
+            println!(
+                "{mt}{i} {c}",
+                c = style_text(cmd, Ansi::from_fg(Colors::LawnGreen)),
+                mt = if indent { "\t" } else { "" },
+                i = style_text("$", Ansi::from_fg(Colors::GoldenRod))
+            );
         } else {
             println!(
-                "{2}$ {0} {1}",
-                cmd,
-                args.iter()
+                "{mt}{i} {c} {a}",
+                c = style_text(cmd, Ansi::from_fg(Colors::LawnGreen)),
+                a = args
+                    .iter()
                     .map(|s| if quote_args {
-                        format!("\"{}\"", s)
+                        format!(
+                            "{q}{}{q}",
+                            if s.starts_with('-') {
+                                style_text(s, Ansi::from_fg(Colors::Purple))
+                            } else {
+                                style_text(s, Ansi::from_fg(Colors::White))
+                            },
+                            q = style_text("\"", Ansi::from_fg(Colors::Gray))
+                        )
                     } else {
-                        s.to_string()
+                        style_text(s.to_string(), Ansi::from_fg(Colors::White))
                     })
                     .collect::<Vec<_>>()
                     .join(" "),
-                if indent { "\t" } else { "" }
+                i = style_text("$", Ansi::from_fg(Colors::GoldenRod)),
+                mt = if indent { "\t" } else { "" },
             );
         }
     }
     fn term_out(text: &str, indent: bool) {
-        println!("{1}$ {0}", text, if indent { "\t" } else { "" });
+        println!(
+            "{mt}{i} {0}",
+            style_text(text, Ansi::from_fg(Colors::White)),
+            mt = if indent { "\t" } else { "" },
+            i = style_text("$", Ansi::from_fg(Colors::GoldenRod))
+        );
     }
 
     let this_bin = if let Some(n) = bin.rfind(['/', '\\']) {

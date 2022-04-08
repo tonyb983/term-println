@@ -27,8 +27,14 @@ pub struct FormatSpec {
     pub spec_num: usize,
     pub arg_num: Option<usize>,
     pub arg_name: Option<String>,
-    pub align: Option<Alignment>,
+    pub align: Alignment,
     pub width: Option<usize>,
+}
+
+mod detail {
+    pub type LeftParse = (Option<String>, Option<usize>);
+    pub type RightParse = (super::Alignment, Option<usize>);
+    pub type FullParse = (LeftParse, RightParse);
 }
 
 impl FormatSpec {
@@ -39,7 +45,7 @@ impl FormatSpec {
                 spec_num: spec_no,
                 arg_name: None,
                 arg_num: None,
-                align: None,
+                align: Alignment::Left,
                 width: None,
             });
         }
@@ -54,85 +60,90 @@ impl FormatSpec {
 
         let inner = spec_str.trim_start_matches('{').trim_end_matches('}');
         if inner.is_empty() {
-            Ok(Self {
+            return Ok(Self {
                 fmt_pos: fmt_start,
                 spec_num: spec_no,
                 arg_name: None,
                 arg_num: None,
-                align: None,
+                align: Alignment::Left,
                 width: None,
-            })
-        } else if let Some(colon_pos) = inner.find(':') {
-            let (left, rest) = inner.split_at(colon_pos);
-            let mut right = &rest[1..];
-            let (arg_name, arg_num) = if left.is_empty() {
-                (None, None)
-            } else if let Ok(num) = left.parse::<usize>() {
-                (None, Some(num))
-            } else if arg_name_regex().is_match(left) {
-                (Some(left.to_string()), None)
-            } else {
-                eprintln!("Unable to parse left side of colon in spec: {}", spec_str);
-                return Err(crate::Error::InvalidSpec(spec_str.to_string()));
-            };
-
-            let align = if right.starts_with(['<', '>', '^']) {
-                let a = match right.chars().next().unwrap() {
-                    '<' => Alignment::Left,
-                    '>' => Alignment::Right,
-                    '^' => Alignment::Center,
-                    _ => unreachable!(),
-                };
-                right = &right[1..];
-                Some(a)
-            } else {
-                // TODO: Should this be None? Should align be Alignment instead of Option<Alignment>?
-                Some(Alignment::Left)
-            };
-
-            let width = if right.is_empty() {
-                None
-            } else if let Ok(n) = right.parse::<usize>() {
-                Some(n)
-            } else {
-                return Err(crate::Error::bad_spec(spec_str));
-            };
-
-            Ok(Self {
-                fmt_pos: fmt_start,
-                spec_num: spec_no,
-                arg_name,
-                arg_num,
-                align,
-                width,
-            })
-        } else if let Ok(num) = inner.parse::<usize>() {
-            Ok(Self {
-                fmt_pos: fmt_start,
-                spec_num: spec_no,
-                arg_name: None,
-                arg_num: Some(num),
-                align: None,
-                width: None,
-            })
-        } else if arg_name_regex().is_match(spec_str) {
-            Ok(Self {
-                fmt_pos: fmt_start,
-                spec_num: spec_no,
-                arg_name: Some(inner.to_string()),
-                arg_num: None,
-                align: None,
-                width: None,
-            })
-        } else {
-            Err(crate::Error::bad_spec(spec_str))
+            });
         }
+
+        let ((name, num), (align, width)) = Self::parse_spec(spec_str, inner)?;
+        Ok(Self {
+            fmt_pos: fmt_start,
+            spec_num: spec_no,
+            arg_name: name,
+            arg_num: num,
+            align,
+            width,
+        })
     }
 
     pub fn is_empty(&self) -> bool {
         self.arg_num.is_none()
-            && (self.align.is_none() || matches!(self.align, Some(Alignment::Left)))
+            && self.arg_name.is_none()
+            && self.align == Alignment::Left
             && self.width.is_none()
+    }
+
+    fn parse_spec(entire_spec: &str, inner: &str) -> crate::Result<detail::FullParse> {
+        if let Some(colon_pos) = inner.find(':') {
+            let (left, rest) = inner.split_at(colon_pos);
+            let mut right = &rest[1..];
+            let left_side = Self::parse_spec_left(entire_spec, left)?;
+            let right_parsed = Self::parse_spec_right(entire_spec, right)?;
+            Ok((left_side, right_parsed))
+        } else {
+            let parsed = Self::parse_spec_left(entire_spec, inner)?;
+            Ok((parsed, (Alignment::Left, None)))
+        }
+    }
+
+    fn parse_spec_left(entire: &str, input: &str) -> crate::Result<detail::LeftParse> {
+        if input.is_empty() {
+            Ok((None, None))
+        } else if let Ok(num) = input.parse::<usize>() {
+            Ok((None, Some(num)))
+        } else if arg_name_regex().is_match(input) {
+            Ok((Some(input.to_string()), None))
+        } else {
+            eprintln!("Unable to parse left side of colon in spec: {}", entire);
+            Err(crate::Error::bad_spec(entire))
+        }
+    }
+
+    fn parse_spec_right(entire: &str, input: &str) -> crate::Result<detail::RightParse> {
+        let mut right = input;
+        let align = if right.starts_with(['<', '>', '^']) {
+            let a = match right.chars().next().unwrap() {
+                '<' => Alignment::Left,
+                '>' => Alignment::Right,
+                '^' => Alignment::Center,
+                _ => unreachable!(),
+            };
+            right = &right[1..];
+            a
+        } else {
+            // TODO: Should this be None? Should align be Alignment instead of Option<Alignment>?
+            Alignment::Left
+        };
+
+        let width = if right.is_empty() {
+            None
+        } else if let Ok(n) = right.parse::<usize>() {
+            if n == 0 {
+                eprintln!("Format spec is zero width: {}", entire);
+                return Err(crate::Error::zero_width(entire));
+            }
+            Some(n)
+        } else {
+            eprintln!("Unable to parse right side of colon in spec: {}", entire);
+            return Err(crate::Error::bad_spec(entire));
+        };
+
+        Ok((align, width))
     }
 }
 
@@ -145,7 +156,7 @@ mod tests {
     fn empty_brackets() {
         let spec = FormatSpec::new(0, 0, "{}").expect("Unable to create format spec from {}");
         assert_eq!(spec.arg_num, None);
-        assert_eq!(spec.align, None);
+        assert_eq!(spec.align, Alignment::Left);
         assert_eq!(spec.width, None);
         assert!(spec.is_empty());
     }
@@ -159,6 +170,112 @@ mod tests {
         assert!(spec.is_err());
 
         let spec = FormatSpec::new(0, 0, "}{");
+        assert!(spec.is_err());
+
+        let spec = FormatSpec::new(0, 0, "{}}");
+        assert!(spec.is_err());
+
+        let spec = FormatSpec::new(0, 0, "{{}");
+        assert!(spec.is_err());
+
+        let spec = FormatSpec::new(0, 0, "{1:0}");
+        assert!(spec.is_err());
+    }
+
+    #[test]
+    fn basic_usages() {
+        let spec = FormatSpec::new(0, 0, "{}").expect("error parsing {}");
+        assert!(spec.is_empty());
+        assert_eq!(spec.align, Alignment::Left);
+        assert_eq!(spec.width, None);
+        assert_eq!(spec.arg_num, None);
+        assert_eq!(spec.arg_name, None);
+
+        let spec = FormatSpec::new(0, 0, "{0}").expect("error parsing {0}");
+        assert!(!spec.is_empty());
+        assert_eq!(spec.align, Alignment::Left);
+        assert_eq!(spec.width, None);
+        assert_eq!(spec.arg_num, Some(0));
+        assert_eq!(spec.arg_name, None);
+
+        let spec = FormatSpec::new(0, 0, "{10}").expect("error parsing {10}");
+        assert!(!spec.is_empty());
+        assert_eq!(spec.align, Alignment::Left);
+        assert_eq!(spec.width, None);
+        assert_eq!(spec.arg_num, Some(10));
+        assert_eq!(spec.arg_name, None);
+
+        let spec = FormatSpec::new(0, 0, "{name}").expect("error parsing {name}");
+        assert!(!spec.is_empty());
+        assert_eq!(spec.align, Alignment::Left);
+        assert_eq!(spec.width, None);
+        assert_eq!(spec.arg_num, None);
+        assert_eq!(spec.arg_name, Some("name".to_string()));
+
+        let spec = FormatSpec::new(0, 0, "{:>}").expect("error parsing {:>}");
+        assert!(!spec.is_empty());
+        assert_eq!(spec.align, Alignment::Right);
+        assert_eq!(spec.width, None);
+        assert_eq!(spec.arg_num, None);
+        assert_eq!(spec.arg_name, None);
+
+        let spec = FormatSpec::new(0, 0, "{:1}").expect("error parsing {:1}");
+        assert!(!spec.is_empty());
+        assert_eq!(spec.align, Alignment::Left);
+        assert_eq!(spec.width, Some(1));
+        assert_eq!(spec.arg_num, None);
+        assert_eq!(spec.arg_name, None);
+
+        let spec = FormatSpec::new(0, 0, "{:10}").expect("error parsing {:10}");
+        assert!(!spec.is_empty());
+        assert_eq!(spec.align, Alignment::Left);
+        assert_eq!(spec.width, Some(10));
+        assert_eq!(spec.arg_num, None);
+        assert_eq!(spec.arg_name, None);
+
+        let spec = FormatSpec::new(0, 0, "{name:^}").expect("error parsing {name:^}");
+        assert!(!spec.is_empty());
+        assert_eq!(spec.align, Alignment::Center);
+        assert_eq!(spec.width, None);
+        assert_eq!(spec.arg_num, None);
+        assert_eq!(spec.arg_name, Some("name".to_string()));
+
+        let spec = FormatSpec::new(0, 0, "{2:>}").expect("error parsing {2:>}");
+        assert!(!spec.is_empty());
+        assert_eq!(spec.align, Alignment::Right);
+        assert_eq!(spec.width, None);
+        assert_eq!(spec.arg_num, Some(2));
+        assert_eq!(spec.arg_name, None);
+
+        let spec = FormatSpec::new(0, 0, "{10:<}").expect("error parsing {10:<}");
+        assert!(!spec.is_empty());
+        assert_eq!(spec.align, Alignment::Left);
+        assert_eq!(spec.width, None);
+        assert_eq!(spec.arg_num, Some(10));
+        assert_eq!(spec.arg_name, None);
+
+        let spec = FormatSpec::new(0, 0, "{name:^10}").expect("error parsing {name:^10}");
+        assert!(!spec.is_empty());
+        assert_eq!(spec.align, Alignment::Center);
+        assert_eq!(spec.width, Some(10));
+        assert_eq!(spec.arg_num, None);
+        assert_eq!(spec.arg_name, Some("name".to_string()));
+
+        let spec = FormatSpec::new(0, 0, "{2:>5}").expect("error parsing {2:>5}");
+        assert!(!spec.is_empty());
+        assert_eq!(spec.align, Alignment::Right);
+        assert_eq!(spec.width, Some(5));
+        assert_eq!(spec.arg_num, Some(2));
+        assert_eq!(spec.arg_name, None);
+
+        let spec = FormatSpec::new(0, 0, "{10:<1}").expect("error parsing {10:<1}");
+        assert!(!spec.is_empty());
+        assert_eq!(spec.align, Alignment::Left);
+        assert_eq!(spec.width, Some(1));
+        assert_eq!(spec.arg_num, Some(10));
+        assert_eq!(spec.arg_name, None);
+
+        let spec = FormatSpec::new(0, 0, "{name:>0}");
         assert!(spec.is_err());
     }
 }

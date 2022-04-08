@@ -122,10 +122,7 @@ impl Formatter {
                 Some(w) => w,
                 None => UnicodeWidthStr::width(insert.as_str()),
             };
-            let align = match spec.align {
-                Some(a) => a,
-                None => Alignment::Left,
-            };
+            let align = spec.align;
             let prepared = Self::prepare_string(insert.as_str(), align, width);
 
             mods.push((prepared, spec.fmt_pos));

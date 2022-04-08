@@ -33,6 +33,10 @@ impl Error {
     pub fn bad_spec(spec: &str) -> Self {
         Self::InvalidSpec(format!("Invalid format specifier: {}", spec))
     }
+
+    pub fn zero_width(spec: &str) -> Self {
+        Self::InvalidSpec(format!("Format specifier cannot be zero-width: {}", spec))
+    }
 }
 
 impl std::fmt::Display for Error {

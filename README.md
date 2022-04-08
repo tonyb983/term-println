@@ -10,7 +10,14 @@ Notable Sections
 - [Formatter::format](./src/fmt/mod.rs) & [Formatter::format_owned](./src/fmt/mod.rs) - Convenience functions that wrap `Formatter::new` and `Formatter::generate`, creating output from a format string and arguments
 
 Todo
-- [ ] Implement more formatting specs. I am currently parsing alignment and width but not using them at all.
+- [ ] Implement more formatting specs. ~~I am currently parsing alignment and width but not using them at all.~~
+    - [x] Width
+    - [x] Alignment
+    - [x] Positional Args
+    - [x] Numbered Args
+    - [x] Named Args
+    - [ ] What else?
+- [ ] Should a zero width spec aka `{:0}` be an error?
 - [ ] Investigate whether the unicode character substitution I use in [Formatter::parse_fmt](./src/fmt/mod.rs:89) is at all safe to do.
 - [ ] Colors? Maybe add color as an option within the formatting spec?
 - [ ] When implementing the alignment and width, use the `terminal_size` crate to make sure everything fits nicely.
